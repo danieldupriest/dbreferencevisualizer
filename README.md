@@ -1,2 +1,2 @@
-# dbreferencevisualizer
-Visually see the foreign key dependencies in a database
+# dbcomparator
+Compare table schema between mysql servers

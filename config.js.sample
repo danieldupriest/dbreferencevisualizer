@@ -1,0 +1,8 @@
+module.exports = {
+  db: {
+    host: 'hostUrl',
+    user: 'username',
+    password: 'password',
+    database: 'databaseName',
+  },
+};

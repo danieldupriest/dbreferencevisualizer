@@ -1,0 +1,25 @@
+{
+  "name": "dbcomparator",
+  "version": "1.0.0",
+  "description": "Compare table schema between mysql servers",
+  "main": "run.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "visualize": "node visualize.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danieldupriest/dbcomparator.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/danieldupriest/dbcomparator/issues"
+  },
+  "homepage": "https://github.com/danieldupriest/dbcomparator#readme",
+  "dependencies": {
+    "diff": "^5.1.0",
+    "dotenv": "^16.0.1",
+    "mysql": "^2.18.1"
+  }
+}
