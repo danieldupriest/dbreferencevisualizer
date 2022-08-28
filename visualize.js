@@ -3,7 +3,7 @@ const mysql = require('mysql');
 const util = require('util');
 const { table } = require('console');
 
-const columnWidth = 20;
+const columnWidth = 24;
 
 class Canvas {
   constructor(width = 300, height = 300) {
@@ -86,108 +86,139 @@ class Canvas {
 }
 
 class TreeNode {
-  constructor(name) {
+  constructor(name, fill = '-') {
     this.name = name;
-    this.children = {};
+    this.children = [];
+    this.fill = fill;
   }
+
+  pad(text, width, fill = this.fill, left = true){
+    const diff = width - text.length;
+    if(diff < 0) throw new Error('Column not wide enough to pad.')
+    let padding = fill.repeat(diff);
+    if (left) return text + padding;
+    else return padding + text;
+  }  
 
   height() {
     let childrenHeight = 0;
 
-    const children = Object.values(this.children);
-    for (const child of children) {
+    for (const child of this.children) {
       childrenHeight += child.height();
     }
-
+    
     return Math.max(2, childrenHeight);
   }
 
-  width() { 
+  width() {
     return this.toString().length;
   }
 
-  render(canvas, xOffset = 0, yOffset = 0) {
-    const tableNameWidth = this.width();
-    const fields = Object.keys(this.children);
-    const children = Object.values(this.children);
+  render() {
+    const canvas = new Canvas(1000, 1000);
+    let toRender = [];
+    toRender.push([ { x: 0,  y: 0, node: this } ]);
 
-    // Draw table name
-    canvas.draw(this.toString(), xOffset, yOffset);
-    
-    // Find width to draw fields
-    let maxFieldWidth = 0;
-    for (const field of fields) {
-      maxFieldWidth = Math.max(maxFieldWidth, field.length);
-    }
-    maxFieldWidth += 2;
-
-    // Draw fields and children
-    let y = 0;
-    for (let j = 0; j < children.length; j++) {
-      const child = children[j];
-      const field = fields[j];
-
-      // Draw connecting dots
-      for (let i = 0; i < maxFieldWidth; i++) {
-        canvas.draw('·', xOffset + tableNameWidth + 3 + i, yOffset + y)  
+    while (toRender.length > 0) {
+      const columnNodes = toRender.shift();
+      let levelWidth = 0;
+      
+      for (const { x, y, node } of columnNodes) {
+        levelWidth = Math.max(node.width(), levelWidth);
       }
+      
+      let nextColumn = [];
 
-      // Draw vertical lines
-      if (j < children.length - 1) {
-        for (let i = 0; i <= child.height(); i++) {
-          canvas.draw('║', xOffset + tableNameWidth, yOffset + y + i);
+      // Draw lines and children
+      for (const { x, y, node } of columnNodes) {
+        // Draw node
+        if (!node.children.length) {
+          canvas.draw(node.toString(), x, y);
+          continue;
+        }
+
+        const nodeText = node.pad(node.toString(), levelWidth);
+        canvas.draw(nodeText, x, y);
+
+        // Draw connections to children
+        let i = 0;
+        
+        for (let j = 0; j < node.children.length; j++) {
+          const child = node.children[j];
+
+          // Draw vertical lines
+          if (j < node.children.length - 1) {
+            for (let k = 0; k <= child.height(); k++) {
+              canvas.draw('│', x + levelWidth, y + i + k);
+            }
+          }
+          
+          // Draw conjunctions
+          if (node.children.length === 1) {
+            canvas.draw('─', x + levelWidth, y);
+          } else if (j === node.children.length - 1) {
+            canvas.draw('└', x + levelWidth, y + i);
+          } else if (j === 0) {
+            canvas.draw('┬', x + levelWidth, y + i);
+          } else {
+            canvas.draw('├', x + levelWidth, y + i);
+          }
+          
+          // Add children of next column.
+          nextColumn.push({ x: x + levelWidth + 1, y: y + i, node: child });
+          i += child.height();
         }
       }
-      
-      // Draw conjunctions
-      if (children.length === 1) {
-        canvas.draw('═', xOffset + tableNameWidth, yOffset);
-      } else if (j === children.length - 1) {
-        canvas.draw('╚', xOffset + tableNameWidth, yOffset + y);
-      } else if (j === 0) {
-        canvas.draw('╦', xOffset + tableNameWidth, yOffset + y);
-      } else {
-        canvas.draw('╠', xOffset + tableNameWidth, yOffset + y);
-      }
-      
-      // Draw field
-      canvas.draw(' ' + field + ' ', xOffset + tableNameWidth + 1, yOffset + y);
 
-      child.render(
-        canvas,
-        xOffset + tableNameWidth + maxFieldWidth + 2,
-        yOffset + y,
-      );
-
-      y += child.height();
+      if (nextColumn.length > 0) toRender.push(nextColumn);
     }
     
     return canvas;
   }
-  /*
-  ┌───────┬────────────┐
-│       │            │
-│       │            │
-│       │            │
-├───────┼────────────┤
-│       │            │
-│       │            │
-├───────┼──────────┐ │
-│       │          │ │
-│       │          │ │
-│       │          │ │
-│       │          │ │
-│       │          │ │
-│       │          │ │
-│       │          │ │
-└───────┴──────────┴─┘
-*/
-  toString() {
-    return ' [' + this.name + '] ';
+
+  addChild(child) {
+    this.children.push(child);
   }
 
-  addChild(name, child) {
-    this.children[name] = child;
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index > -1) {
+      this.children.splice(index, 1);
+    }
+  }
+}
+
+class Field extends TreeNode {
+  constructor(name) {
+    super(name);
+  }
+
+  pad(text, width, fill = '─'){
+    const diff = width - text.length;
+    if(diff < 0) throw new Error('Column not wide enough to pad.')
+    let padding = fill.repeat(diff);
+    return padding + text;
+  }  
+
+  toString() {
+    return ' ' + this.name;
+  }
+}
+
+class Table extends TreeNode {
+  constructor(name) {
+    super(name);
+  }
+
+  pad(text, width, fill = '─'){
+    const diff = width - text.length;
+    if(diff < 0) throw new Error('Column not wide enough to pad.')
+    let padding = fill.repeat(diff);
+    return text + padding;
+  }
+
+  toString() {
+    return '[' + this.name + '] ';
   }
 }
 
@@ -205,35 +236,30 @@ function makeDb(config) {
   }
 }
 
-function half(length) {
-  const left = Math.floor(length / 2);
-  const right = Math.ceil(length / 2);
-  return { left, right };
-}
-
-async function generateTables(db) {
-  const tableNames = await getTables(db);
-  tableNames.sort();
-
-  const results = [];
-
-  for (const tableName of tableNames) {
-    const schemaText = await getCreateSchema(db, tableName);
-    const table = new Table(schemaText)
-    results.push(table);
-  }
-
-  return results;
-}
-
 function buildTree(tables, relationships, rootNodeName) {
   const rootNode = tables[rootNodeName];
-  //console.log(rootNode);
-  //console.log(tables);
 
+  function formsCycle(node = rootNode, visited = []) {
+    if (visited.includes(node)) return true;
+    visited.push(node);
+
+    for (const child of node.children) {
+      if (formsCycle(child, visited)) return true;
+    }
+
+    return false;
+  }
+  
+  // Link tables
   for (const { from, to, via } of relationships) {
-    //console.log(from, to, via);
-    tables[to].addChild(via, tables[from]);
+    const fieldNode = new Field(via);
+    fieldNode.addChild(tables[from]);
+    tables[to].addChild(fieldNode);
+
+    // Check if we created a cycle
+    if (formsCycle(rootNode)) {
+      tables[to].removeChild(fieldNode);
+    }
   }
 
   return rootNode;
@@ -285,7 +311,7 @@ async function generateTables(db) {
   const results = {};
 
   for (const name of tableNames) {
-    const node = new TreeNode(name)
+    const node = new Table(name)
     results[name] = node;
   }
 
@@ -313,7 +339,7 @@ const main = async() => {
   const db = makeDb(config.db);
   const tables = await generateTables(db);
   const relationships = await generateRelationships(db);
-  const tree = buildTree(tables, relationships, 'users');  
+  const tree = buildTree(tables, relationships, 'users');
   const canvas = new Canvas();
   const output = tree.render(canvas);
   console.log(output.toString());
